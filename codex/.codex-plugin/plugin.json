@@ -1,6 +1,6 @@
 {
   "name": "codie",
-  "version": "0.10.11",
+  "version": "0.10.11-agent.1",
   "description": "Codie device pairing, voice tasks and reminders",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",

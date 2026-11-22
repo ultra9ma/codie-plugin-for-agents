@@ -1,6 +1,6 @@
 {
   "name": "codie",
-  "version": "0.10.11",
+  "version": "0.10.11-agent.1",
   "description": "Connect directly to Codie devices on your LAN: receive Codie instructions, send back task summaries, check connection status",
   "author": { "name": "Codie" },
   "channels": [{ "server": "codie" }]

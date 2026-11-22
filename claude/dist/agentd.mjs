@@ -7595,7 +7595,7 @@ var lsofOut = (args) => new Promise((resolve, reject) => {
 });
 
 // ../codie_host/src/agentd/daemon/version.mjs
-var AGENTD_VERSION = 48;
+var AGENTD_VERSION = 1048;
 
 // ../codie_host/src/agentd/daemon/router.mjs
 import { randomUUID as randomUUID2 } from "node:crypto";
@@ -8148,7 +8148,7 @@ var Router = class {
   #route(event, tried) {
     const { taskId } = event;
     if (!this.tasks.get(taskId)) return;
-    if (event.routing) {
+    if (event.routing || event.agent === "codex") {
       if (this.background(event)) this.link.accept(taskId, ACCEPTED);
       else this.link.sendError(taskId, "No connected Codex session is available. Open the target session and try again.");
       return;
@@ -8163,7 +8163,7 @@ var Router = class {
       this.#push(target, { type: "task", ...event });
       return;
     }
-    if (!tried.has("listen") && this.listening()) {
+    if (!tried.has("listen") && !event.agent && this.listening()) {
       this.inbox.set(taskId, { event, tried, timer: this.#pickupTimer(event, tried) });
       this.link.accept(taskId, ACCEPTED);
       for (const s of this.sessions.values()) for (const wake of [...s.pollWaiters]) wake();
@@ -9110,7 +9110,7 @@ var Dispatcher = class {
   }
   // Takes the task (the Router accepts it) or returns false.
   take(event) {
-    const backend = event.routing ? this.#codexOn() && this.hasCodexSession() ? "codex" : null : this.backend();
+    const backend = event.routing || event.agent === "codex" ? this.#codexOn() && this.hasCodexSession() ? "codex" : null : event.agent === "claude" ? this.#claudeOn() && this.claudeCwd() ? "claude" : null : this.backend();
     if (!backend) return false;
     this.jobs++;
     this.#run(event, backend, this.claudeCwd()).catch((e) => this.log("dispatch failed", e?.message ?? e)).finally(() => {
@@ -9159,7 +9159,7 @@ var Dispatcher = class {
           return;
         }
         if (where) job = this.#codexJob(event, thread);
-        else if (event.routing) {
+        else if (event.routing || event.agent === "codex") {
           this.link.sendError(taskId, e.message);
           return;
         } else if (!(this.#claudeOn() && cwd)) {
@@ -10288,7 +10288,7 @@ var ASK_RESULT = {
 var AGENT_TOOLS = validateTools([
   {
     name: "ask_agent",
-    version: "v7",
+    version: "v8",
     risk: "reversible",
     idempotent: false,
     confirmation_required: false,
@@ -10304,7 +10304,12 @@ var AGENT_TOOLS = validateTools([
           enum: ["auto", "idle", "continue", "session"],
           description: 'auto (default): an independent task. idle: the user requires an idle session; rejected when none is idle. continue: an unnamed follow-up such as "continue the previous task". session: the user named a session or project (give target).'
         },
-        target: { type: "string", description: "Only with mode session: the exact session or project the user named. Never invent one." }
+        target: { type: "string", description: "Only with mode session: the exact session or project the user named. Never invent one." },
+        agent: {
+          type: "string",
+          enum: ["any", "claude", "codex"],
+          description: 'any (default): whichever agent is available. claude / codex: only when the user explicitly names that agent ("with Claude", "Claudeで", "クロードで", "with Codex", "Codexで", "コーデックスで"). Never guess from the task content. claude works only with mode auto.'
+        }
       },
       required: ["prompt"],
       additionalProperties: false
@@ -10332,11 +10337,15 @@ function askRequest(args) {
   const prompt = typeof args?.prompt === "string" ? args.prompt.trim() : "";
   if (!prompt) return { error: "The task prompt must not be empty." };
   const mode = args.mode ?? "auto";
+  const agent = args.agent ?? "any";
   const target = typeof args.target === "string" ? args.target.trim() : "";
+  if (!["any", "claude", "codex"].includes(agent)) return { error: "agent must be any, claude or codex." };
+  if (agent === "claude" && mode !== "auto") return { error: "Session routing works only with Codex. Use mode auto for Claude." };
   if (mode === "session" && !target) return { error: "Specify the session or project to continue." };
   if (mode !== "session" && target) return { error: "Only session routing may specify a target session." };
-  if (mode === "auto") return { text: prompt };
-  return { text: prompt, routing: { mode, ...mode === "session" ? { target } : {} } };
+  const via = agent === "any" ? {} : { agent };
+  if (mode === "auto") return { text: prompt, ...via };
+  return { text: prompt, ...via, routing: { mode, ...mode === "session" ? { target } : {} } };
 }
 var AgentsHost = class _AgentsHost {
   // `onUnreachable(deviceId, error)` / `onReachable(deviceId)` hear whether a link's

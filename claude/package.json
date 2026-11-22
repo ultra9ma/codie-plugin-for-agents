@@ -1,6 +1,6 @@
 {
   "name": "codie-claude-plugin",
-  "version": "0.10.11",
+  "version": "0.10.11-agent.1",
   "private": true,
   "type": "module",
   "engines": {

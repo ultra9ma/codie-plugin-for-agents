@@ -17011,7 +17011,7 @@ import fs2 from "node:fs";
 import path3 from "node:path";
 
 // ../codie_host/src/agentd/daemon/version.mjs
-var AGENTD_VERSION = 48;
+var AGENTD_VERSION = 1048;
 
 // ../codie_host/src/agentd/store.mjs
 import crypto from "node:crypto";
